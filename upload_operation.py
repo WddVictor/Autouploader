@@ -1,5 +1,5 @@
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, InvalidArgumentException
 from config import *
 from operations import *
 import csv
@@ -7,20 +7,6 @@ import os
 import glob
 import time
 import re
-
-reports_path = os.path.join(APKs_path, 'report')
-md5_csv_path = os.path.join(reports_path, 'md5.csv')
-
-options = webdriver.ChromeOptions()
-if head_less_flag:
-    print('all the web will be hidden')
-    options.add_argument('--headless')
-options.add_argument('--disable-gpu')
-options.add_argument(
-    "--user-data-dir=/Users/victor/Library/Application Support/Google/Chrome/Default")  # Path to your chrome profile
-
-driver = webdriver.Chrome(executable_path=driver_path, options=options)
-driver.set_page_load_timeout(10)
 
 
 def report_form(num: int, md5: str) -> str:
@@ -36,7 +22,7 @@ def up2(file_path) -> str:
     result_url = 'null'
     open_web_auto_refresh(driver, webs[2])
     time.sleep(1)
-    driver.find_element_by_name("file").send_keys(file_path)
+    driver.find_element_by_name("file").send_keys(os.path.abspath(file_path))
     time.sleep(2)
     for i in range(0, 3):
         try:
@@ -54,7 +40,7 @@ def up3(file_path) -> bool:
     driver.get("https://service.security.tencent.com/kingkong")
     time.sleep(0.5)
     try:
-        driver.find_element_by_id("txtFile").send_keys(file_path)
+        driver.find_element_by_id("txtFile").send_keys(os.path.abspath(file_path))
         driver.implicitly_wait(100)
         result = True
     except NoSuchElementException:
@@ -65,7 +51,7 @@ def up3(file_path) -> bool:
 def up4(file_path) -> bool:
     driver.get("https://habo.qq.com/")
     driver.implicitly_wait(30)
-    driver.find_element_by_id("file_upload2").send_keys(file_path)
+    driver.find_element_by_id("file_upload2").send_keys(os.path.abspath(file_path))
     while driver.current_url == webs[4]:
         try:
             if re.search('display: block',
@@ -101,7 +87,7 @@ def read_md5(csv_path) -> dict:
 
 
 def up2_report():
-    report_header = ['app', 'web', 'report']
+    report_header = ['app', 'report']
     report_csv_path = os.path.join(reports_path, 'report_2.csv')
     with open(report_csv_path, "w", encoding='utf8', newline='') as out_report:
         report_writer = csv.DictWriter(out_report, report_header)
@@ -111,17 +97,41 @@ def up2_report():
         for app in md5_data.keys():
             if md5_data[app] != 'fails':
                 report_writer.writerow(
-                    {'app': app, 'web': webs[2], 'report': report_form(2, md5_data[app])})
+                    {'app': app, 'report': report_form(2, md5_data[app])})
 
 
 def init():
+    global md5_csv_path, options, driver
+
+    try_to_mkdir(md5_path)
+    try_to_mkdir(reports_path)
+    try_to_mkdir(APKs_path)
+    try_to_mkdir(reports_path)
+
     if md5_clear_flag:
         print('All the data in md5 file will be cleared')
     if omit_fail_file:
         print('Failed files will be omitted')
 
-    try_to_mkdir(reports_path)
     md5_header = ['app', 'md5']
+
+    md5_csv_path = os.path.join(md5_path, 'md5.csv')
+
+    options = webdriver.ChromeOptions()
+    if head_less_flag:
+        print('all the web will be hidden')
+        options.add_argument('--headless')
+    options.add_argument('--disable-gpu')
+    if use_users_cache:
+        print('use users\' data to speed up')
+        options.add_argument(
+            "--user-data-dir=" + user_profile)
+    try:
+        driver = webdriver.Chrome(executable_path=driver_path, options=options)
+    except InvalidArgumentException:
+        print('please kill chrome completely')
+        sys.exit(1)
+    driver.set_page_load_timeout(10)
 
     is_exist = os.path.exists(md5_csv_path)
     pre_data = {}
@@ -251,7 +261,7 @@ def up4_report():
 
 def up8(file_path) -> bool:
     driver.get(webs[8])
-    driver.find_element_by_id("fileinput").send_keys(file_path)
+    driver.find_element_by_id("fileinput").send_keys(os.path.abspath(file_path))
     time.sleep(1)
     driver.find_element_by_id("btnStartID").click()
     for i in range(0, 5):
@@ -308,12 +318,18 @@ def up8_report():
 
 def up10(file_path) -> bool:
     driver.get(webs[10])
-    driver.find_element_by_id("file-input").send_keys(file_path)
+    driver.find_element_by_id("file-input").send_keys(os.path.abspath(file_path))
     time.sleep(3)
     return True
 
 
 def up10_report():
+    global driver
+    driver.quit()
+    options.add_argument('--headless')
+    driver = webdriver.Chrome(executable_path=driver_path, options=options)
+    driver.set_page_load_timeout(10)
+
     report10_path = os.path.join(reports_path, 'report_10')
 
     try_to_mkdir(report10_path)
@@ -384,7 +400,7 @@ def up1(file_path):
             if re.match('html*', content) is not None:
                 file_input = i
                 break
-        file_input.send_keys(file_path)
+        file_input.send_keys(os.path.abspath(file_path))
         print('uploading')
         while driver.find_element_by_class_name('uploadProgress').get_attribute(
                 'style') != 'height: 10px; display: none;':
@@ -451,3 +467,6 @@ def up1_report():
             link = report_form(1, title)
             report_writer.writerow({'app': name, 'report': link})
 
+
+def close_driver():
+    driver.quit()
