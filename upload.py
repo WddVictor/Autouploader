@@ -82,10 +82,9 @@ def open_web_1():
     open_web_auto_refresh(driver, 'http://www.ijiami.cn/tlogin')
     driver.find_element_by_id('email').clear()
     time.sleep(1)
-    driver.find_element_by_id('email').send_keys('n1803749f@e.ntu.edu.sg')
-    driver.find_element_by_id('pwd').send_keys('1234qwer')
-    while driver.current_url == 'http://www.ijiami.cn/tlogin':
-        time.sleep(2)
+    driver.find_element_by_id('email').send_keys('xhkgiovb@drope.ml')
+    driver.find_element_by_id('pwd').send_keys('1234')
+    wait_web(driver, 'http://www.ijiami.cn/tlogin', False)
 
 
 def update_report_1():
@@ -121,24 +120,31 @@ def update_name_md5():
             app_name_con[app] = name
             to_write[name] = md5
 
+    cards = driver.find_elements_by_class_name('card')
+
     with open(os.path.join(reports_path, 'name_md5_correspondence.csv'), "w", encoding='utf8', newline='') as out:
         writer = csv.DictWriter(out, header)
         writer.writeheader()
         writer.writerows(dict_to_csv(to_write, 'name', 'md5'))
-        for app in report_data.keys():
-            if report_data[app] != 'tmp' and app not in app_name_con.keys():
-                driver.get(report_data[app])
-                time.sleep(2)
-                while True:
-                    name = driver.find_element_by_id('appName').get_attribute('textContent')
-                    if name != '':
-                        break
-                    time.sleep(1)
-                if len(name) > 12:
-                    name = name[0:12] + '..'
-                version = driver.find_element_by_id('version').get_attribute('textContent')
-                md5 = driver.find_element_by_id('MD5').get_attribute('textContent')
-                writer.writerow({'name': name + ' V' + version, 'md5': md5})
+        for card in cards[1:]:
+            name = card.find_element_by_xpath('.//div[@class="name"]').get_attribute('textContent')
+            title = card.find_element_by_xpath('./div[@class="titles"]').get_attribute('app')
+            link = report_form(1, title)
+            report_writer.writerow({'app': name, 'report': link})
+        # for app in report_data.keys():
+        #     if report_data[app] != 'tmp' and app not in app_name_con.keys():
+        #         driver.get(report_data[app])
+        #         time.sleep(2)
+        #         while True:
+        #             name = driver.find_element_by_id('appName').get_attribute('textContent')
+        #             if name != '':
+        #                 break
+        #             time.sleep(1)
+        #         if len(name) > 12:
+        #             name = name[0:12] + '..'
+        #         version = driver.find_element_by_id('version').get_attribute('textContent')
+        #         md5 = driver.find_element_by_id('MD5').get_attribute('textContent')
+        #         writer.writerow({'name': name + ' V' + version, 'md5': md5})
 
 
 def up1_report():
@@ -206,22 +212,28 @@ def up3_report():
         for file_path in glob.glob(os.path.join(APKs_path, '*.apk')):
             base_name = os.path.basename(file_path)
             if base_name in report_data.keys():
-                continue
+                if omit_fail_file:
+                    continue
+                elif report_data[base_name] != 'fails':
+                    continue
             print(base_name + ' ...')
             if up3(file_path):
                 print('uploading')
                 while driver.find_element_by_id('apk_label').get_attribute('textContent') == '正在上传':
                     time.sleep(2)
 
-                if driver.find_element_by_id('apk_label').get_attribute('textContent') == '上传文件不合法':
+                if driver.find_element_by_id('apk_label').get_attribute('textContent') != '审计完成！':
                     print('file is illegal')
+                    report_writer.writerow(
+                        {'app': base_name, 'report': 'fails'})
                     continue
                 report_writer.writerow(
                     {'app': base_name, 'report': report_form(3, app_2_md5[base_name])})
 
                 print('ok')
             else:
-                app_2_md5[base_name] = 'fails'
+                report_writer.writerow(
+                    {'app': base_name, 'report': 'fails'})
                 print('fails')
 
 
@@ -243,9 +255,7 @@ def up4(file_path) -> bool:
 
 def up4_report():
     report_csv_path_4 = report_csv_path(4)
-    report_data = {}
-    if os.path.exists(report_csv_path_4):
-        report_data = read_report(report_csv_path_4)
+    report_data = read_report(report_csv_path_4)
     report_header = ['app', 'report']
     with open(report_csv_path_4, "w", encoding='utf8', newline='') as out_report:
 
@@ -259,6 +269,7 @@ def up4_report():
                 driver.find_element_by_id("file_upload-button").click()
                 break
             except TimeoutException:
+                time.sleep(3)
                 continue
 
         while driver.find_element_by_id('loginframe').get_attribute('style') != '':
@@ -269,7 +280,7 @@ def up4_report():
             if base_name in report_data.keys():
                 continue
 
-            print(base_name + ' ...', end=' ')
+            print(base_name + ' ...')
             if os.path.getsize(file_path) > 30000000:
                 print('too big')
             elif up4(file_path):
@@ -338,6 +349,77 @@ def up8_report():
             print('fails')
 
 
+def check_files_9() -> list:
+    report_data = read_report(report_csv_path(9))
+    to_do_files_path = []
+    for file_path in glob.glob(os.path.join(APKs_path, '*.apk')):
+        base_name = os.path.basename(file_path)
+        if base_name in report_data.keys():
+            if omit_fail_file or report_data[base_name] != 'fails':
+                continue
+        else:
+            to_do_files_path.append(file_path)
+    return to_do_files_path
+
+
+def up9(file_path: str) -> bool:
+    while True:
+        a = input()
+        if a == 'u':
+            return True
+        elif a == 'd':
+            return False
+        else:
+            continue
+
+    open_web_auto_refresh(driver, webs[9])
+    driver.find_element_by_id('manualFileField').send_keys(os.path.abspath(file_path))
+    while True:
+        time.sleep(2)
+        if driver.find_element_by_id('progressLbl').get_attribute('textContent') == 'Upload completed':
+            break
+    try:
+        driver.find_element_by_link_text('click here')
+        return True
+    except NoSuchElementException:
+        pass
+    driver.find_element_by_class_name('g-recaptcha').click()
+    time.sleep(2)
+    while True:
+        try:
+            if driver.find_element_by_id('scanButtonContainer').get_attribute(
+                    'textContent') == '\n\t\t\tScanning ...\n\t\t':
+                time.sleep(2)
+                return True
+            else:
+                driver.find_element_by_id('scanButtonContainer').click()
+                time.sleep(3)
+        except ElementClickInterceptedException:
+            continue
+
+
+def up9_report():
+    to_do_files_path = check_files_9()
+    report_data = read_report(report_csv_path(9))
+    report_data = report_filter(report_data, ['fails'])
+    report_header = ['app', 'report']
+    with open(report_csv_path(9), 'w', encoding='utf-8', newline='') as out_report:
+        report_writer = csv.DictWriter(out_report, report_header)
+        report_writer.writeheader()
+        report_writer.writerows(dict_to_csv(report_data, 'app', 'report'))
+
+        for file_path in to_do_files_path:
+            base_name = os.path.basename(file_path)
+            print(base_name + ' ...')
+            if up9(file_path):
+                report_writer.writerow({'app': base_name, 'report': report_form(9, app_2_md5[base_name])})
+                print('ok')
+
+            else:
+                report_writer.writerow({'app': base_name, 'report': 'fails'})
+                print('fails')
+
+
 def up10(file_path) -> bool:
     driver.get(webs[10])
     driver.find_element_by_id("file-input").send_keys(os.path.abspath(file_path))
@@ -374,6 +456,17 @@ def up10_report():
                 print('too big')
         else:
             print('fails')
+
+
+def up_bangbang_report():
+    open_web_auto_refresh(driver, 'https://dev.bangcle.com/apps/index')
+    driver.find_element_by_id('user').clear()
+    driver.find_element_by_id('user').send_keys('m1u9d8jq@mail.bccto.me')
+    time.sleep(0.5)
+    driver.find_element_by_id('psd').send_keys('1234qwer')
+    time.sleep(0.5)
+    wait_web(driver, webs[12], redirect_to_input_web=True)
+    pass
 
 
 def webshot(pic_path) -> bool:
@@ -471,6 +564,27 @@ def init():
 
     app_2_md5 = read_md5(md5_csv_path)
     md5_2_app = read_md5(md5_csv_path, True)
+
+    # report_3_filter()
+
+
+def report_3_filter():
+    report_data = read_report(report_csv_path(3))
+
+    for app in list(report_data.keys()):
+        driver.get(report_data[app])
+        time.sleep(2)
+        try:
+            if driver.find_element_by_xpath('/html/head/title').get_attribute(
+                    'textContent') == '腾讯安全应急响应中心(TSRC)支持公益事业':
+                report_data.pop(app)
+        except Exception as e:
+            continue
+    report_header = ['app', 'report']
+    with open(report_csv_path(3), "w", encoding='utf8', newline='') as out_report:
+        report_writer = csv.DictWriter(out_report, report_header)
+        report_writer.writeheader()
+        report_writer.writerows(dict_to_csv(report_data, 'app', 'report'))
 
 
 def close_driver():
