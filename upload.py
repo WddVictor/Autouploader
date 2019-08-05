@@ -46,11 +46,6 @@ def up1(file_path):
     return True
 
 
-def resolve_name_md5():
-    global name_md5_con
-    name_md5_con = read_report(os.path.join(reports_path, 'name_md5_correspondence.csv'), read_by_name=True)
-
-
 def upload_files_1():
     report_csv_path_1 = report_csv_path(1)
     report_data = read_report(report_csv_path_1)
@@ -82,77 +77,63 @@ def open_web_1():
     open_web_auto_refresh(driver, 'http://www.ijiami.cn/tlogin')
     driver.find_element_by_id('email').clear()
     time.sleep(1)
-    driver.find_element_by_id('email').send_keys('xhkgiovb@drope.ml')
-    driver.find_element_by_id('pwd').send_keys('1234')
+    driver.find_element_by_id('email').send_keys('N1803749F@e.ntu.edu.sg')
+    driver.find_element_by_id('pwd').send_keys('1234qwer')
+    driver.find_element_by_id('code').send_keys('')
     wait_web(driver, 'http://www.ijiami.cn/tlogin', False)
+    open_web_auto_refresh(driver, webs[1])
 
 
 def update_report_1():
-    report_header = ['app', 'report']
-    open_web_auto_refresh(driver, webs[1])
-    time.sleep(2)
-    report_csv_path_1 = report_csv_path(1)
-
-    cards = driver.find_elements_by_class_name('card')
-
-    with open(report_csv_path_1, "w", encoding='utf8', newline='') as out_report:
-        report_writer = csv.DictWriter(out_report, report_header)
-        report_writer.writeheader()
-        for card in cards[1:]:
-            name = card.find_element_by_xpath('.//div[@class="name"]').get_attribute('textContent')
-            title = card.find_element_by_xpath('./div[@class="titles"]').get_attribute('app')
-            link = report_form(1, title)
-            report_writer.writerow({'app': name, 'report': link})
-
-
-def update_name_md5():
+    name_md5_con = read_report(os.path.join(reports_path, 'name_md5_correspondence.csv'), read_by_name=True)
     report_csv_path_1 = report_csv_path(1)
     report_data = read_report(report_csv_path_1)
-    header = ['name', 'md5']
+    header = ['app', 'report']
+
     to_write = dict({})
-
-    app_name_con = dict({})
-    for md5 in name_md5_con.keys():
-        if md5 in md5_2_app.keys():
-            name = name_md5_con[md5]
-            app = md5_2_app[md5]
-            app_name_con[name] = app
-            app_name_con[app] = name
-            to_write[name] = md5
-
+    time.sleep(1)
     cards = driver.find_elements_by_class_name('card')
+    cards_data = dict({})
+    for card in cards[1:]:
+        if card.find_element_by_xpath('./div[@class="titles"]/span').get_attribute('textContent') == '检测中':
+            continue
+        name = card.find_element_by_xpath('.//div[@class="name"]').get_attribute('textContent')
+        if name in name_md5_con.keys():
+            continue
+        title = card.find_element_by_xpath('./div[@class="titles"]').get_attribute('app')
+        link = report_form(1, title)
+        cards_data[name] = link
 
+    with open(report_csv_path_1, "w", encoding='utf8', newline='') as out:
+        writer = csv.DictWriter(out, header)
+        writer.writeheader()
+        writer.writerows(dict_to_csv(report_data, 'app', 'report'))
+        for name in cards_data.keys():
+            link = cards_data[name]
+            open_web_auto_refresh(driver, link)
+            while True:
+                time.sleep(2)
+                md5 = driver.find_element_by_id('MD5').get_attribute('textContent')
+                if md5 != '':
+                    break
+            if md5 not in md5_2_app.keys():
+                continue
+            app = md5_2_app[md5]
+            to_write[name] = md5
+            writer.writerow({'app': app, 'report': link})
+
+    header = ['name', 'md5']
     with open(os.path.join(reports_path, 'name_md5_correspondence.csv'), "w", encoding='utf8', newline='') as out:
         writer = csv.DictWriter(out, header)
         writer.writeheader()
+        writer.writerows(dict_to_csv(name_md5_con, 'name', 'md5'))
         writer.writerows(dict_to_csv(to_write, 'name', 'md5'))
-        for card in cards[1:]:
-            name = card.find_element_by_xpath('.//div[@class="name"]').get_attribute('textContent')
-            title = card.find_element_by_xpath('./div[@class="titles"]').get_attribute('app')
-            link = report_form(1, title)
-            report_writer.writerow({'app': name, 'report': link})
-        # for app in report_data.keys():
-        #     if report_data[app] != 'tmp' and app not in app_name_con.keys():
-        #         driver.get(report_data[app])
-        #         time.sleep(2)
-        #         while True:
-        #             name = driver.find_element_by_id('appName').get_attribute('textContent')
-        #             if name != '':
-        #                 break
-        #             time.sleep(1)
-        #         if len(name) > 12:
-        #             name = name[0:12] + '..'
-        #         version = driver.find_element_by_id('version').get_attribute('textContent')
-        #         md5 = driver.find_element_by_id('MD5').get_attribute('textContent')
-        #         writer.writerow({'name': name + ' V' + version, 'md5': md5})
 
 
 def up1_report():
     open_web_1()
-    resolve_name_md5()
-    update_name_md5()
-    upload_files_1()
     update_report_1()
+    # upload_files_1()
 
 
 def up2(file_path) -> str:
@@ -203,6 +184,9 @@ def up3_report():
     report_csv_path_3 = report_csv_path(3)
 
     report_data = read_report(report_csv_path_3)
+    if not omit_fail_file:
+        report_data = report_filter(report_data, ['fails'])
+
     report_header = ['app', 'report']
     with open(report_csv_path_3, "w", encoding='utf8', newline='') as out_report:
         report_writer = csv.DictWriter(out_report, report_header)
@@ -212,17 +196,14 @@ def up3_report():
         for file_path in glob.glob(os.path.join(APKs_path, '*.apk')):
             base_name = os.path.basename(file_path)
             if base_name in report_data.keys():
-                if omit_fail_file:
-                    continue
-                elif report_data[base_name] != 'fails':
-                    continue
+                continue
             print(base_name + ' ...')
             if up3(file_path):
                 print('uploading')
                 while driver.find_element_by_id('apk_label').get_attribute('textContent') == '正在上传':
                     time.sleep(2)
 
-                if driver.find_element_by_id('apk_label').get_attribute('textContent') != '审计完成！':
+                if driver.find_element_by_id('apk_label').get_attribute('textContent') not in ('审计完成！', '上传提示'):
                     print('file is illegal')
                     report_writer.writerow(
                         {'app': base_name, 'report': 'fails'})

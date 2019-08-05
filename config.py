@@ -1,12 +1,12 @@
 driver_path = "./driver/chromedriver"
 user_profile = '/Users/victor/Library/Application Support/Google/Chrome/Default'
 
-reports_path = './report'
-md5_path = './md5'
-APKs_path = "./APKs"
+reports_path = '/Users/victor/Downloads/report'
+md5_path = '/Users/victor/Downloads/md5'
+APKs_path = "/Users/victor/Downloads/apks"
 
 md5_clear_flag = False  # clear md5.csv and re-fill
-omit_fail_file = True   # omit the failed files (in md5.csv)
+omit_fail_file = False   # omit the failed files (in md5.csv)
 head_less_flag = False  # display the chrome during execution
 use_users_cache = True  # use cache to speed up web redirection
 
