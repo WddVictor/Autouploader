@@ -77,7 +77,7 @@ def open_web_1():
     open_web_auto_refresh(driver, 'http://www.ijiami.cn/tlogin')
     driver.find_element_by_id('email').clear()
     time.sleep(1)
-    driver.find_element_by_id('email').send_keys('N1803749F@e.ntu.edu.sg')
+    driver.find_element_by_id('email').send_keys('c455034@urhen.com')
     driver.find_element_by_id('pwd').send_keys('1234qwer')
     driver.find_element_by_id('code').send_keys('')
     wait_web(driver, 'http://www.ijiami.cn/tlogin', False)
@@ -91,8 +91,14 @@ def update_report_1():
     header = ['app', 'report']
 
     to_write = dict({})
-    time.sleep(1)
-    cards = driver.find_elements_by_class_name('card')
+    while True:
+        time.sleep(2)
+        cards = driver.find_elements_by_class_name('card')
+        if len(cards) == 1:
+            continue
+        else:
+            break
+
     cards_data = dict({})
     for card in cards[1:]:
         if card.find_element_by_xpath('./div[@class="titles"]/span').get_attribute('textContent') == '检测中':
